@@ -1,0 +1,80 @@
+#!/usr/bin/env bash
+
+# Display help function
+show_help() {
+  echo "Usage: branchify -t TICKET_ID -d \"Ticket description here\""
+  echo ""
+  echo "Options:"
+  echo "  -t, --ticket       Ticket ID (e.g., ID-1000)"
+  echo "  -d, --description  Description of the ticket"
+  echo "  -h, --help         Show this help message"
+}
+
+# Parse command line arguments
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    -t|--ticket)
+      if [[ -z "$2" || "$2" == -* ]]; then
+        echo "Error: Ticket ID requires a value"
+        show_help
+        exit 1
+      fi
+      ticket_id="$2"
+      shift 2
+      ;;
+    -d|--description)
+      if [[ -z "$2" || "$2" == -* ]]; then
+        echo "Error: Description requires a value"
+        show_help
+        exit 1
+      fi
+      description="$2"
+      shift 2
+      ;;
+    -h|--help)
+      show_help
+      exit 0
+      ;;
+    *)
+      echo "Unknown option: $1"
+      show_help
+      exit 1
+      ;;
+  esac
+done
+
+# Validate required parameters
+if [ -z "$ticket_id" ] || [ -z "$description" ]; then
+  echo "Error: Both ticket ID and description are required"
+  show_help
+  exit 1
+fi
+
+# Validate we're in a git repository
+if ! git rev-parse --is-inside-work-tree &>/dev/null; then
+  echo "Error: Not in a git repository"
+  exit 1
+fi
+
+# Format the description:
+# 1. Convert to lowercase
+# 2. Replace all punctuation and whitespace with single hyphen
+# 3. Remove leading and trailing hyphens
+# 4. Collapse multiple hyphens into a single hyphen
+title=$(echo "$description" | \
+  tr '[:upper:]' '[:lower:]' | \
+  tr -c '[:alnum:]' '-' | \
+  sed -e 's/-\{2,\}/-/g' | \
+  sed -e 's/^-//' -e 's/-$//')
+
+branch_name="${ticket_id}/${title}"
+
+echo "Creating branch: $branch_name"
+
+# Create and switch to the new branch
+if git checkout -b "$branch_name"; then
+  echo "Successfully created and switched to branch: $branch_name"
+else
+  echo "Failed to create branch. Please check your git configuration."
+  exit 1
+fi
